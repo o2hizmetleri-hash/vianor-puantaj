@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cherry-900: #4a1c24;
+  --cherry-800: #5c2530;
+  --cherry-700: #722f37;
+  --cherry-600: #8b3a47;
+  --cherry-500: #a04757;
+  --cream-50: #fdf8f0;
+  --cream-100: #f9f1e3;
+  --cream-200: #f5e6d3;
+  --cream-300: #edd9bc;
+  --cream-400: #d4b896;
+  --ink-900: #2a1810;
+  --ink-600: #5c4a3d;
+  --success: #6b8e4e;
+  --warning: #c77d3a;
+  --danger: #a03030;
+}
+
+* {
+  border-color: var(--cream-300);
+}
+
+html,
+body {
+  background-color: var(--cream-50);
+  color: var(--ink-900);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+body {
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: var(--font-playfair), "Playfair Display", ui-serif, Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.font-mono, code, kbd, pre, samp {
+  font-family: var(--font-jetbrains), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Subtle wine-cellar grain background for main content */
+.bg-grain {
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(114, 47, 55, 0.04) 0, transparent 40%),
+    radial-gradient(circle at 80% 90%, rgba(160, 71, 87, 0.04) 0, transparent 40%),
+    linear-gradient(180deg, #fdf8f0 0%, #f9f1e3 100%);
+}
+
+/* Sidebar gradient */
+.bg-sidebar {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(160, 71, 87, 0.18) 0, transparent 50%),
+    linear-gradient(180deg, #4a1c24 0%, #3a141b 100%);
+}
+
+/* Decorative gold accent line */
+.gold-line {
+  background: linear-gradient(90deg, transparent, #d4b896 20%, #d4b896 80%, transparent);
+  height: 1px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cream-100);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cream-400);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cherry-500);
+}
+
+/* Print styles for payslip */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
