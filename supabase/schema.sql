@@ -52,11 +52,11 @@ create table if not exists shifts (
   created_at timestamptz default now()
 );
 
+-- Vianor standardı: tüm vardiyalar 9 saat (7.5 sa çalışma + 1.5 sa mola)
 insert into shifts (name, start_time, end_time, expected_hours, color) values
-  ('Sabah', '09:00', '17:00', 8, '#C77D3A'),
-  ('Akşam', '17:00', '01:00', 8, '#722F37'),
-  ('Kapanış', '20:00', '03:00', 7, '#4A1C24'),
-  ('Tam Gün', '11:00', '23:00', 12, '#8B3A47')
+  ('Sabah (10:00–19:00)',   '10:00', '19:00', 9, '#C77D3A'),
+  ('Orta (11:30–20:30)',    '11:30', '20:30', 9, '#8B3A47'),
+  ('Akşam (14:00–23:00)',   '14:00', '23:00', 9, '#722F37')
 on conflict do nothing;
 
 -- ============ PUANTAJ ============
@@ -175,7 +175,7 @@ create table if not exists app_settings (
   id int primary key default 1,
   restaurant_name text default 'Vianor Maison de Viande',
   monthly_work_days int default 30,
-  daily_work_hours numeric(4,2) default 8,
+  daily_work_hours numeric(4,2) default 9,
   late_tolerance_minutes int default 5,
   overtime_threshold_minutes int default 30,
   currency text default 'TRY',

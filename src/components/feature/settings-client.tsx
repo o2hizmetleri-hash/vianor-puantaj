@@ -69,7 +69,7 @@ function GeneralSettings({ settings }: { settings: AppSettings | null }) {
   const [form, setForm] = useState({
     restaurant_name: settings?.restaurant_name || "Vianor Maison de Viande",
     monthly_work_days: settings?.monthly_work_days ?? 30,
-    daily_work_hours: settings?.daily_work_hours ?? 8,
+    daily_work_hours: settings?.daily_work_hours ?? 9,
     late_tolerance_minutes: settings?.late_tolerance_minutes ?? 5,
     overtime_threshold_minutes: settings?.overtime_threshold_minutes ?? 30,
     currency: settings?.currency || "TRY",

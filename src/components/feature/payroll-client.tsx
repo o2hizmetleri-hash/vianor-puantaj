@@ -269,6 +269,13 @@ export function PayrollClient({
             </div>
           </div>
 
+          <p className="mt-3 text-xs text-ink-600">
+            Maaş, puantaja göre <strong>oransal</strong> hesaplanır: tam aylık maaş
+            ÷ <strong>{settings.monthly_work_days}</strong> = günlük ücret. Puantajda
+            "gelmedi" işaretli veya hiç <strong>kayıt girilmemiş</strong> günler devamsızlık
+            olarak düşülür · ücretsiz izinler ayrıca kesilir.
+          </p>
+
           {rows.length > 0 && (
             <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
               <div className="bg-cream-100 rounded-sm p-3">
@@ -438,6 +445,17 @@ export function PayrollClient({
                 <div>
                   <p className="text-ink-600">Saatlik Ücret</p>
                   <p className="font-mono">{formatTRY(detail.hourly_rate)}</p>
+                </div>
+                <div className="col-span-2 mt-1 pt-2 border-t border-cream-300">
+                  <p className="text-ink-600">Hak Edilen Brüt (puantaja göre)</p>
+                  <p className="font-mono font-semibold text-cherry-800">
+                    {formatTRY(
+                      Math.max(
+                        0,
+                        Number(detail.base_salary) - Number(detail.absent_deductions)
+                      )
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="space-y-1 text-sm border-t pt-2">

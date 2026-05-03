@@ -72,7 +72,7 @@ export default async function MaasPage({ searchParams }: Props) {
         existingPayroll={(payrollRes.data as any[]) || []}
         settings={(settingsRes.data as any) || {
           monthly_work_days: 30,
-          daily_work_hours: 8,
+          daily_work_hours: 9,
           late_tolerance_minutes: 5,
           overtime_threshold_minutes: 30,
           restaurant_name: "Vianor Maison de Viande",
