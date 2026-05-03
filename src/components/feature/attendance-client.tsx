@@ -27,6 +27,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ATTENDANCE_STATUS,
+  DEFAULT_SHIFT_HOURS,
+  addHoursToTime,
   cn,
   diffHoursOvernight,
   diffMinutes,
@@ -120,7 +122,18 @@ export function AttendanceClient({
   const updateRow = (id: string, patch: Partial<RowState>) => {
     setRows((prev) => {
       const next = { ...prev[id], ...patch, dirty: true };
-      // Otomatik hesaplamalar
+
+      // ⚡ Geliş saati DEĞİŞTİ → çıkış otomatik geliş + 9 saat (mola dahil)
+      // Vardiya seçili ise vardiyanın expected_hours'ı kullanılır, yoksa varsayılan 9.
+      // Kullanıcı ayrıca çıkışı manuel girmediyse otomatik atılır.
+      if (patch.check_in !== undefined && patch.check_in && patch.check_out === undefined) {
+        const hoursToAdd = next.shift_id
+          ? shifts.find((s) => s.id === next.shift_id)?.expected_hours || DEFAULT_SHIFT_HOURS
+          : DEFAULT_SHIFT_HOURS;
+        next.check_out = addHoursToTime(patch.check_in, hoursToAdd);
+      }
+
+      // Otomatik hesaplamalar (vardiya tabanlı geç/erken)
       if (
         next.shift_id &&
         (patch.shift_id !== undefined || patch.check_in !== undefined || patch.check_out !== undefined)
@@ -446,10 +459,21 @@ export function AttendanceClient({
                         onValueChange={(v) => {
                           const shiftId = v === "none" ? null : v;
                           const shift = shiftId ? shifts.find((s) => s.id === shiftId) : null;
+                          // Vardiya seçildiğinde: geliş = vardiya başlangıcı,
+                          // çıkış = geliş + 9 saat (mola dahil)
+                          const newCheckIn = shift && !r.check_in
+                            ? shift.start_time.slice(0, 5)
+                            : r.check_in;
+                          const newCheckOut = newCheckIn && (!r.check_out || shift)
+                            ? addHoursToTime(
+                                newCheckIn,
+                                shift?.expected_hours || DEFAULT_SHIFT_HOURS
+                              )
+                            : r.check_out;
                           updateRow(e.id, {
                             shift_id: shiftId,
-                            check_in: shift && !r.check_in ? shift.start_time.slice(0, 5) : r.check_in,
-                            check_out: shift && !r.check_out ? shift.end_time.slice(0, 5) : r.check_out,
+                            check_in: newCheckIn,
+                            check_out: newCheckOut,
                           });
                         }}
                       >
@@ -543,8 +567,9 @@ export function AttendanceClient({
 
       <p className="text-xs text-ink-600 flex items-center gap-2">
         <Clock className="h-3 w-3" />
-        Mesai eşiği: {overtimeThresholdMin} dk · Geç kalma toleransı: {lateTolerance} dk · Otomatik
-        hesaplanır, manuel düzenlenebilir.
+        Standart vardiya: {DEFAULT_SHIFT_HOURS} saat (7.5 sa çalışma + 1.5 sa mola) · Geliş saati
+        seçilince çıkış otomatik hesaplanır · Mesai eşiği: {overtimeThresholdMin} dk · Geç kalma
+        toleransı: {lateTolerance} dk · Tüm değerler manuel düzenlenebilir.
       </p>
     </div>
   );

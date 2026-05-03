@@ -128,6 +128,23 @@ export function diffHoursOvernight(checkIn: string, checkOut: string) {
   return mins / 60;
 }
 
+/**
+ * Vianor standart vardiya: 7.5 saat yasal çalışma + 1.5 saat mola = 9 saat dükkanda.
+ * Geliş saati üzerine eklenerek otomatik çıkış saati hesaplanır.
+ */
+export const DEFAULT_SHIFT_HOURS = 9;
+
+/** "HH:MM" formatındaki saate verilen saat ekler, sonucu "HH:MM" döndürür (24 saat döngülü) */
+export function addHoursToTime(time: string, hours: number): string {
+  if (!time) return "";
+  const [h, m] = time.split(":").map(Number);
+  const totalMinutes = h * 60 + m + Math.round(hours * 60);
+  const wrapped = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const newH = Math.floor(wrapped / 60);
+  const newM = wrapped % 60;
+  return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+}
+
 export const POSITION_WEIGHTS: Record<string, number> = {
   "Şef": 1.2,
   "Sous Şef": 1.0,
