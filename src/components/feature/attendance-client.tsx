@@ -117,20 +117,17 @@ export function AttendanceClient({
     const params = new URLSearchParams(sp.toString());
     params.set("date", d);
     router.push(`/puantaj?${params.toString()}`);
+    router.refresh();
   };
 
   const updateRow = (id: string, patch: Partial<RowState>) => {
     setRows((prev) => {
       const next = { ...prev[id], ...patch, dirty: true };
 
-      // ⚡ Geliş saati DEĞİŞTİ → çıkış otomatik geliş + 9 saat (mola dahil)
-      // Vardiya seçili ise vardiyanın expected_hours'ı kullanılır, yoksa varsayılan 9.
-      // Kullanıcı ayrıca çıkışı manuel girmediyse otomatik atılır.
+      // ⚡ Vianor standardı: geliş + HER ZAMAN 9 saat (vardiyadan bağımsız)
+      // 7.5 sa çalışma + 1.5 sa mola = 9 saat dükkanda kalış
       if (patch.check_in !== undefined && patch.check_in && patch.check_out === undefined) {
-        const hoursToAdd = next.shift_id
-          ? shifts.find((s) => s.id === next.shift_id)?.expected_hours || DEFAULT_SHIFT_HOURS
-          : DEFAULT_SHIFT_HOURS;
-        next.check_out = addHoursToTime(patch.check_in, hoursToAdd);
+        next.check_out = addHoursToTime(patch.check_in, DEFAULT_SHIFT_HOURS);
       }
 
       // Otomatik hesaplamalar (vardiya tabanlı geç/erken)
@@ -156,8 +153,8 @@ export function AttendanceClient({
           0,
           Number(diffHoursOvernight(next.check_in, next.check_out).toFixed(2))
         );
-        const expected = shifts.find((s) => s.id === next.shift_id)?.expected_hours || 0;
-        const overtimeMin = (next.worked_hours - expected) * 60;
+        // Vianor standardı: standart 9 saat üzerinden mesai
+        const overtimeMin = (next.worked_hours - DEFAULT_SHIFT_HOURS) * 60;
         next.overtime_hours =
           overtimeMin > overtimeThresholdMin
             ? Number((overtimeMin / 60).toFixed(2))
@@ -180,12 +177,22 @@ export function AttendanceClient({
       Object.keys(next).forEach((id) => {
         const r = next[id];
         if (r.status === "absent") {
+          const checkIn =
+            r.check_in || defaultShift?.start_time.slice(0, 5) || "10:00";
+          // Vianor: çıkış her zaman geliş + 9 saat
+          const checkOut =
+            r.check_out || addHoursToTime(checkIn, DEFAULT_SHIFT_HOURS);
+          const workedHours = Math.max(
+            0,
+            Number(diffHoursOvernight(checkIn, checkOut).toFixed(2))
+          );
           next[id] = {
             ...r,
             status: "present",
             shift_id: r.shift_id || defaultShift?.id || null,
-            check_in: r.check_in || defaultShift?.start_time.slice(0, 5) || null,
-            check_out: r.check_out || defaultShift?.end_time.slice(0, 5) || null,
+            check_in: checkIn,
+            check_out: checkOut,
+            worked_hours: workedHours,
             dirty: true,
           };
         }
@@ -459,16 +466,13 @@ export function AttendanceClient({
                         onValueChange={(v) => {
                           const shiftId = v === "none" ? null : v;
                           const shift = shiftId ? shifts.find((s) => s.id === shiftId) : null;
-                          // Vardiya seçildiğinde: geliş = vardiya başlangıcı,
-                          // çıkış = geliş + 9 saat (mola dahil)
-                          const newCheckIn = shift && !r.check_in
-                            ? shift.start_time.slice(0, 5)
-                            : r.check_in;
-                          const newCheckOut = newCheckIn && (!r.check_out || shift)
-                            ? addHoursToTime(
-                                newCheckIn,
-                                shift?.expected_hours || DEFAULT_SHIFT_HOURS
-                              )
+                          // Vardiya seçilince: geliş = (varsa mevcut, yoksa vardiya başlangıcı),
+                          // çıkış = geliş + HER ZAMAN 9 saat
+                          const newCheckIn = r.check_in
+                            ? r.check_in
+                            : shift?.start_time.slice(0, 5) || null;
+                          const newCheckOut = newCheckIn
+                            ? addHoursToTime(newCheckIn, DEFAULT_SHIFT_HOURS)
                             : r.check_out;
                           updateRow(e.id, {
                             shift_id: shiftId,
@@ -567,9 +571,11 @@ export function AttendanceClient({
 
       <p className="text-xs text-ink-600 flex items-center gap-2">
         <Clock className="h-3 w-3" />
-        Standart vardiya: {DEFAULT_SHIFT_HOURS} saat (7.5 sa çalışma + 1.5 sa mola) · Geliş saati
-        seçilince çıkış otomatik hesaplanır · Mesai eşiği: {overtimeThresholdMin} dk · Geç kalma
-        toleransı: {lateTolerance} dk · Tüm değerler manuel düzenlenebilir.
+        Standart: <strong>{DEFAULT_SHIFT_HOURS} saat</strong> dükkanda kalış (7.5 sa çalışma +
+        1.5 sa mola). Geliş saati girilince çıkış otomatik <strong>geliş + 9 saat</strong>{" "}
+        olarak hesaplanır · {DEFAULT_SHIFT_HOURS} saati aşan süre mesaiye eklenir · Mesai eşiği:{" "}
+        {overtimeThresholdMin} dk · Geç kalma toleransı: {lateTolerance} dk · Tüm değerler manuel
+        düzenlenebilir.
       </p>
     </div>
   );

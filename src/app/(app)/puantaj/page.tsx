@@ -40,6 +40,7 @@ export default async function PuantajPage({ searchParams }: Props) {
       </PageHeader>
 
       <AttendanceClient
+        key={date}
         date={date}
         employees={(empRes.data as any[]) || []}
         shifts={(shiftsRes.data as any[]) || []}
