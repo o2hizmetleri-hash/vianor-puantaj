@@ -111,10 +111,19 @@ export function PayrollClient({
   // Mevcut payroll kayıtlarını computed'a entegre et (override)
   const rows = useMemo<(PayrollComputed | (MonthlyPayroll & Partial<PayrollComputed>))[]>(() => {
     if (computed.length > 0) {
-      // Mevcut bordroları işle
+      // Ödeme durumu DB'den; tutarlar her zaman taze hesaptan (eski kayıt üzerine yazılmasın)
       return computed.map((c) => {
         const existing = existingPayroll.find((p) => p.employee_id === c.employee_id);
-        return existing ? { ...c, ...existing, employee: c.employee } : c;
+        if (!existing) return c;
+        return {
+          ...c,
+          id: existing.id,
+          is_paid: existing.is_paid,
+          payment_date: existing.payment_date,
+          payment_method: existing.payment_method,
+          notes: existing.notes ?? c.notes,
+          employee: c.employee,
+        };
       });
     }
     // Sadece veritabanından
@@ -125,6 +134,7 @@ export function PayrollClient({
       hourly_rate: 0,
       late_minutes_total: 0,
       unpaid_leave_days: 0,
+      period_accrued_gross: Number(p.base_salary || 0),
     }));
   }, [computed, existingPayroll, employees]);
 
@@ -275,8 +285,10 @@ export function PayrollClient({
             <strong>resmi tatiller</strong> maaşa dahil kabul edilir, gelinmedi diye düşmez. İş gününde puantaj
             yok veya &quot;gelmedi&quot; ise ücret kesilir. Ücretli izin kayıtlı günlerde kesinti olmaz; ücretsiz
             iş günü izni ayrıca kesilir. Resmi tatilde puantaja <strong>&quot;geldi&quot;</strong> ise yasal 2 kat
-            kapsamında <strong>+1 günlük ücret</strong> kadar Prim (tabloda) eklenir. Resmi tarihler Diyanet ile
-            yılda bir güncellenir.
+            kapsamında <strong>+1 günlük ücret</strong> kadar Prim (tabloda) eklenir.{" "}
+            <strong>Ay bitmeden</strong> hesaplama yapıyorsanız net maaş, tam aylık brüt yerine{" "}
+            <strong>geçen iş günü × günlük ücret</strong> tavanına göre hesaplanır (ay sonunda tavan tam maaşa
+            çıkar). Resmi tatil takvimi paket verisine dayanır.
           </p>
 
           {rows.length > 0 && (
@@ -449,13 +461,19 @@ export function PayrollClient({
                   <p className="text-ink-600">Saatlik Ücret</p>
                   <p className="font-mono">{formatTRY(detail.hourly_rate)}</p>
                 </div>
-                <div className="col-span-2 mt-1 pt-2 border-t border-cream-300">
-                  <p className="text-ink-600">Hak Edilen Brüt (puantaja göre)</p>
+                <div className="col-span-2 mt-1 pt-2 border-t border-cream-300 space-y-1">
+                  <p className="text-ink-600">Bu dönem hak ediş tavanı (maaş/30 × geçen iş günü)</p>
                   <p className="font-mono font-semibold text-cherry-800">
+                    {formatTRY(Number(detail.period_accrued_gross ?? detail.base_salary))}
+                  </p>
+                  <p className="text-ink-600 pt-1">Hak edilen brüt (devamsızlık & ücretsiz izin sonrası)</p>
+                  <p className="font-mono font-semibold text-ink-900">
                     {formatTRY(
                       Math.max(
                         0,
-                        Number(detail.base_salary) - Number(detail.absent_deductions)
+                        Number(detail.period_accrued_gross ?? detail.base_salary) -
+                          Number(detail.absent_deductions) -
+                          Number(detail.unpaid_leave_deductions)
                       )
                     )}
                   </p>

@@ -8,7 +8,6 @@ import type {
   TipsDistribution,
 } from "./types";
 import {
-  attendanceCountsAsWorkedDay,
   eachDateInclusive,
   isPaidWithoutAttendanceDay,
   qualifiesForHolidayWorkPremium,
@@ -30,6 +29,11 @@ export interface PayrollComputed extends Omit<MonthlyPayroll, "id" | "created_at
   late_minutes_total: number;
   /** Ücretsiz izin kayıtlarının iş günleri üzerindeki günü (Pazar/resmi tatil hariç) */
   unpaid_leave_days: number;
+  /**
+   * Ay henüz bitmeden hesaplanıyorsa: geçen iş günü × (maaş/30).
+   * Ay kapandıysa (dönem sonu): tam maktu maaş — böylece kısmi ayda tam brüt + az kesinti hatası oluşmaz.
+   */
+  period_accrued_gross: number;
 }
 
 function leaveOverlapKind(empLeaves: Leave[], d: string): "paid" | "unpaid" | null {
@@ -72,7 +76,6 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
     const attendanceByDate = new Map<string, Attendance>();
     for (const row of empAtt) attendanceByDate.set(row.work_date, row);
 
-    const presentDays = empAtt.filter((a) => attendanceCountsAsWorkedDay(a.status)).length;
     const totalWorkedHours = empAtt.reduce((s, a) => s + Number(a.worked_hours || 0), 0);
     const overtimeHours = empAtt.reduce((s, a) => s + Number(a.overtime_hours || 0), 0);
     const lateMinutesTotal = empAtt.reduce((s, a) => s + (a.late_minutes || 0), 0);
@@ -82,6 +85,8 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
     let absentDeductionDays = 0;
     let unpaidLeaveBusinessDays = 0;
     let holidayWorkPremium = 0;
+    /** Puantaj aralığında Pazar ve resmi tatil hariç iş günü sayısı */
+    let businessDaysInScope = 0;
 
     for (const dStr of eachDateInclusive(empStart, empEnd)) {
       if (isPaidWithoutAttendanceDay(dStr)) {
@@ -91,6 +96,8 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
         }
         continue;
       }
+
+      businessDaysInScope += 1;
 
       const leaveKind = leaveOverlapKind(empLeaves, dStr);
       if (leaveKind === "unpaid") {
@@ -108,6 +115,19 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       }
       /** present dışında (leave/sick/holiday/off vb.) iş günü kaydı — kesinti yok */
     }
+
+    const baseSalary = Number(e.monthly_salary || 0);
+    /** Ay sonuna kadar dönem kapanmadıysa brüt tavan: sadece geçen iş günleri × günlük (maaş/30) */
+    const monthClosedForPeriod = empEnd >= monthEnd;
+    const periodAccruedGross = monthClosedForPeriod
+      ? baseSalary
+      : businessDaysInScope * dailyRate;
+
+    /** Tabloda "çalışılan iş günü": gelinen + ücretli izinli iş günleri (ücretsiz izin ve devamsızlık düşülür) */
+    const workedDays = Math.max(
+      0,
+      businessDaysInScope - absentDeductionDays - unpaidLeaveBusinessDays
+    );
 
     const overtimeAmount = overtimeHours * Number(e.hourly_overtime_rate || 0);
     const lateDeductions = lateMinutesTotal * minuteRate;
@@ -132,11 +152,10 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       )
       .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-    const baseSalary = Number(e.monthly_salary || 0);
     const bonus = round2(holidayWorkPremium);
     const netSalary = Math.max(
       0,
-      baseSalary +
+      periodAccruedGross +
         overtimeAmount +
         tipsAmount +
         bonus -
@@ -150,7 +169,7 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       employee_id: e.id,
       payroll_month: month,
       base_salary: baseSalary,
-      worked_days: presentDays,
+      worked_days: workedDays,
       total_worked_hours: round2(totalWorkedHours),
       overtime_hours: round2(overtimeHours),
       overtime_amount: round2(overtimeAmount),
@@ -170,6 +189,7 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       hourly_rate: round2(hourlyRate),
       late_minutes_total: lateMinutesTotal,
       unpaid_leave_days: unpaidLeaveBusinessDays,
+      period_accrued_gross: round2(periodAccruedGross),
     };
   });
 }
