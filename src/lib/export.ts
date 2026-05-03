@@ -128,7 +128,7 @@ export function exportPayrollXlsx(rows: MonthlyPayroll[], month: string) {
     "Mesai Saat": Number(p.overtime_hours || 0),
     "Mesai Tutarı": Number(p.overtime_amount || 0),
     Bahşiş: Number(p.tips_amount || 0),
-    Prim: Number(p.bonus || 0),
+    "Prim (Resmi tatil)": Number(p.bonus || 0),
     "Devam Kesintisi": Number(p.absent_deductions || 0),
     "Geç Kesintisi": Number(p.late_deductions || 0),
     "Ücretsiz İzin": Number(p.unpaid_leave_deductions || 0),

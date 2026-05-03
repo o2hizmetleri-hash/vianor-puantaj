@@ -115,7 +115,7 @@ export function exportPayslipPdf(p: MonthlyPayroll, restaurantName: string) {
     ["Brut Maas", formatTRY(p.base_salary)],
     [`Mesai (${formatNumber(p.overtime_hours)} sa)`, "+ " + formatTRY(p.overtime_amount)],
     ["Bahsis", "+ " + formatTRY(p.tips_amount)],
-    ["Prim", "+ " + formatTRY(p.bonus)],
+    ["Resmi tatil primi (+)", "+ " + formatTRY(p.bonus)],
     ["Devamsizlik Kesintisi", "- " + formatTRY(p.absent_deductions)],
     ["Gec Kalma Kesintisi", "- " + formatTRY(p.late_deductions)],
     ["Ucretsiz Izin Kesintisi", "- " + formatTRY(p.unpaid_leave_deductions)],
@@ -185,7 +185,7 @@ export function exportPayrollSummaryPdf(rows: MonthlyPayroll[], month: string) {
   const totalNet = rows.reduce((s, r) => s + Number(r.net_salary || 0), 0);
 
   autoTable(doc, {
-    head: [["Personel", "Departman", "Brut", "Mesai", "Bahsis", "Prim", "Kesinti", "NET", "Durum"]],
+    head: [["Personel", "Departman", "Brut", "Mesai", "Bahsis", "Tatil Prim", "Kesinti", "NET", "Durum"]],
     body,
     startY: 34,
     headStyles: { fillColor: CHERRY, textColor: "#FDF8F0", fontStyle: "bold" },
