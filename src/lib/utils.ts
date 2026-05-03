@@ -48,6 +48,13 @@ export function monthLabel(month: string) {
   }
 }
 
+/** `YYYY-MM` için takvimdeki gerçek ay sonu `YYYY-MM-DD` (örn. Şubat 28/29, Nisan 30) */
+export function monthEndIso(monthYyyyMm: string): string {
+  const [y, m] = monthYyyyMm.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${monthYyyyMm}-${String(last).padStart(2, "0")}`;
+}
+
 /* ========== PARA ========== */
 export function formatTRY(value: number | null | undefined, withSymbol = true) {
   const v = Number(value || 0);

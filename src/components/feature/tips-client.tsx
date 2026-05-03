@@ -36,6 +36,28 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { exportTipsXlsx } from "@/lib/export";
 
+/** Yuvarlama sonrası toplamın havuz tutarına tam eşitlenmesi (son kişiye kuruş farkı) */
+function reconcileTipsAmounts(
+  rows: { employee: Employee; amount: number }[],
+  targetTotal: number
+): { employee: Employee; amount: number }[] {
+  if (rows.length === 0) return rows;
+  const out = rows.map((r) => ({
+    ...r,
+    amount: Number(Number(r.amount).toFixed(2)),
+  }));
+  const sum = out.reduce((s, r) => s + r.amount, 0);
+  const drift = Number((targetTotal - sum).toFixed(2));
+  if (drift !== 0) {
+    const last = out[out.length - 1];
+    out[out.length - 1] = {
+      ...last,
+      amount: Number((last.amount + drift).toFixed(2)),
+    };
+  }
+  return out;
+}
+
 interface Props {
   pools: TipsPool[];
   distributions: TipsDistribution[];
@@ -83,8 +105,14 @@ export function TipsClient({ pools, distributions, employees }: Props) {
       let result: { employee: Employee; amount: number }[] = [];
 
       if (form.distribution_method === "equal") {
-        const share = form.total_amount / eligible.length;
-        result = eligible.map((e) => ({ employee: e, amount: Number(share.toFixed(2)) }));
+        const n = eligible.length;
+        const cents = Math.round(form.total_amount * 100);
+        const base = Math.floor(cents / n);
+        const rem = cents % n;
+        result = eligible.map((e, i) => ({
+          employee: e,
+          amount: (base + (i < rem ? 1 : 0)) / 100,
+        }));
       } else if (form.distribution_method === "by_hours") {
         const totalHours = eligible.reduce((s, e) => s + (workingMap.get(e.id) || 0), 0) || 1;
         result = eligible.map((e) => ({
@@ -93,6 +121,7 @@ export function TipsClient({ pools, distributions, employees }: Props) {
             ((workingMap.get(e.id) || 0) / totalHours * form.total_amount).toFixed(2)
           ),
         }));
+        result = reconcileTipsAmounts(result, form.total_amount);
       } else if (form.distribution_method === "by_position") {
         const weights = eligible.map((e) => POSITION_WEIGHTS[e.position || "Diğer"] || 0.7);
         const totalW = weights.reduce((s, w) => s + w, 0) || 1;
@@ -100,6 +129,7 @@ export function TipsClient({ pools, distributions, employees }: Props) {
           employee: e,
           amount: Number(((weights[i] / totalW) * form.total_amount).toFixed(2)),
         }));
+        result = reconcileTipsAmounts(result, form.total_amount);
       }
       setPreviewing(result);
     } catch (e: any) {

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/feature/page-header";
 import { LeavesClient } from "@/components/feature/leaves-client";
 import { StatCard } from "@/components/feature/stat-card";
-import { monthStr } from "@/lib/utils";
+import { monthEndIso, monthStr } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function IzinlerPage() {
   const supabase = createClient();
   const month = monthStr();
   const monthStart = month + "-01";
-  const monthEnd = month + "-31";
+  const monthEnd = monthEndIso(month);
 
   const [leavesRes, empRes] = await Promise.all([
     supabase

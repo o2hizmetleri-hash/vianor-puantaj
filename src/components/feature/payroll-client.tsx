@@ -334,7 +334,7 @@ export function PayrollClient({
               </Button>
             </div>
           ) : (
-            <table className="w-full text-sm min-w-[1100px]">
+            <table className="w-full text-sm min-w-[1180px]">
               <thead className="bg-cream-100 text-ink-600 text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left px-4 py-3">Personel</th>
@@ -343,6 +343,7 @@ export function PayrollClient({
                   <th className="text-right px-2 py-3">Bahşiş</th>
                   <th className="text-right px-2 py-3">Prim (Resmi tat.)</th>
                   <th className="text-right px-2 py-3">Devam(-)</th>
+                  <th className="text-right px-2 py-3">Ücr.İzin(-)</th>
                   <th className="text-right px-2 py-3">Geç(-)</th>
                   <th className="text-right px-2 py-3">Avans(-)</th>
                   <th className="text-right px-3 py-3">NET</th>
@@ -369,6 +370,10 @@ export function PayrollClient({
                     <td className="px-2 py-3 text-right font-mono">{formatTRY(r.bonus)}</td>
                     <td className="px-2 py-3 text-right font-mono text-danger">
                       {Number(r.absent_deductions) > 0 ? "- " : ""}{formatTRY(r.absent_deductions)}
+                    </td>
+                    <td className="px-2 py-3 text-right font-mono text-danger">
+                      {Number(r.unpaid_leave_deductions) > 0 ? "- " : ""}
+                      {formatTRY(r.unpaid_leave_deductions)}
                     </td>
                     <td className="px-2 py-3 text-right font-mono text-danger">
                       {Number(r.late_deductions) > 0 ? "- " : ""}{formatTRY(r.late_deductions)}

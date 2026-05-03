@@ -30,6 +30,7 @@ import {
   formatHours,
   formatNumber,
   formatTRY,
+  monthEndIso,
   monthLabel,
   monthStr,
 } from "@/lib/utils";
@@ -145,7 +146,7 @@ function MonthlyAttendanceReport({ employees }: { employees: Employee[] }) {
     setLoading(true);
     try {
       const supabase = createClient();
-      const monthEnd = month + "-31";
+      const monthEnd = monthEndIso(month);
       const { data, error } = await supabase
         .from("attendance")
         .select("*, employee:employees(*, department:departments(*)), shift:shifts(*)")
@@ -368,7 +369,7 @@ function DepartmentReport({ departments }: { departments: Department[] }) {
     try {
       const supabase = createClient();
       const start = month + "-01";
-      const end = month + "-31";
+      const end = monthEndIso(month);
       const [att, emp] = await Promise.all([
         supabase
           .from("attendance")
@@ -490,7 +491,7 @@ function LateReport({ employees }: { employees: Employee[] }) {
     try {
       const supabase = createClient();
       const start = month + "-01";
-      const end = month + "-31";
+      const end = monthEndIso(month);
       const { data, error } = await supabase
         .from("attendance")
         .select("employee_id, late_minutes")
@@ -572,7 +573,7 @@ function OvertimeReport({ employees }: { employees: Employee[] }) {
     try {
       const supabase = createClient();
       const start = month + "-01";
-      const end = month + "-31";
+      const end = monthEndIso(month);
       const { data, error } = await supabase
         .from("attendance")
         .select("employee_id, overtime_hours")
@@ -656,7 +657,7 @@ function TipsReport({ employees }: { employees: Employee[] }) {
     try {
       const supabase = createClient();
       const start = month + "-01";
-      const end = month + "-31";
+      const end = monthEndIso(month);
       const { data, error } = await supabase
         .from("tips_distribution")
         .select("*, pool:tips_pool(*)")
