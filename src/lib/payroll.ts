@@ -7,6 +7,12 @@ import type {
   MonthlyPayroll,
   TipsDistribution,
 } from "./types";
+import {
+  attendanceCountsAsWorkedDay,
+  eachDateInclusive,
+  isPaidWithoutAttendanceDay,
+  qualifiesForHolidayWorkPremium,
+} from "./tr-payroll-calendar";
 
 export interface PayrollInput {
   employees: Employee[];
@@ -19,11 +25,19 @@ export interface PayrollInput {
 }
 
 export interface PayrollComputed extends Omit<MonthlyPayroll, "id" | "created_at" | "updated_at"> {
-  // helper fields for UI
   daily_rate: number;
   hourly_rate: number;
   late_minutes_total: number;
+  /** Ücretsiz izin kayıtlarının iş günleri üzerindeki günü (Pazar/resmi tatil hariç) */
   unpaid_leave_days: number;
+}
+
+function leaveOverlapKind(empLeaves: Leave[], d: string): "paid" | "unpaid" | null {
+  for (const l of empLeaves) {
+    if (d < l.start_date || d > l.end_date) continue;
+    return l.is_paid ? "paid" : "unpaid";
+  }
+  return null;
 }
 
 export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
@@ -38,19 +52,12 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
   const today = new Date().toISOString().slice(0, 10);
 
   return employees.map((e) => {
-    // Personelin bu aydaki "geçerli aralığı": işe başlama / ayrılma + ay sonu / bugün ile sınırlı
     const empStart = e.start_date && e.start_date > monthStart ? e.start_date : monthStart;
     const empEndRaw = e.end_date && e.end_date < monthEnd ? e.end_date : monthEnd;
-    // Geleceği maaş hesabına dahil etme — bugüne kadar olan günleri say
     const empEnd = empEndRaw > today ? today : empEndRaw;
 
-    // O personel için ay içindeki "beklenen iş günleri" (her gün açık restoran varsayımı)
-    const expectedDaysInRange = Math.max(
-      0,
-      diffDays(empStart, empEnd) + 1
-    );
     const monthlyWorkDays = Math.max(1, settings.monthly_work_days);
-    // Aylık baz: 30 (settings) gün üzerinden günlük ücret
+    /** Maktu maaş: tam maaş / 30 gün ile günlük ücret — kesintiler günlük kazanımdan yapılır */
     const dailyRate = Number(e.monthly_salary) / monthlyWorkDays;
     const hourlyRate = dailyRate / Math.max(1, settings.daily_work_hours);
     const minuteRate = hourlyRate / 60;
@@ -62,53 +69,50 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
         a.work_date <= empEnd
     );
 
-    const presentDays = empAtt.filter(
-      (a) => a.status === "present" || a.status === "leave" || a.status === "sick"
-    ).length;
-    const explicitAbsentDays = empAtt.filter((a) => a.status === "absent").length;
-    const totalWorkedHours = empAtt.reduce(
-      (s, a) => s + Number(a.worked_hours || 0),
-      0
-    );
-    const overtimeHours = empAtt.reduce(
-      (s, a) => s + Number(a.overtime_hours || 0),
-      0
-    );
-    const lateMinutesTotal = empAtt.reduce(
-      (s, a) => s + (a.late_minutes || 0),
-      0
-    );
+    const attendanceByDate = new Map<string, Attendance>();
+    for (const row of empAtt) attendanceByDate.set(row.work_date, row);
 
-    // Ücretsiz izin gün sayısı (ay aralığı ile kesişim)
+    const presentDays = empAtt.filter((a) => attendanceCountsAsWorkedDay(a.status)).length;
+    const totalWorkedHours = empAtt.reduce((s, a) => s + Number(a.worked_hours || 0), 0);
+    const overtimeHours = empAtt.reduce((s, a) => s + Number(a.overtime_hours || 0), 0);
+    const lateMinutesTotal = empAtt.reduce((s, a) => s + (a.late_minutes || 0), 0);
+
     const empLeaves = leaves.filter((l) => l.employee_id === e.id);
-    let unpaidLeaveDays = 0;
-    let paidLeaveDays = 0;
-    for (const l of empLeaves) {
-      const ls = l.start_date < empStart ? empStart : l.start_date;
-      const le = l.end_date > empEnd ? empEnd : l.end_date;
-      if (ls > le) continue;
-      const days = diffDays(ls, le) + 1;
-      if (l.is_paid) paidLeaveDays += days;
-      else unpaidLeaveDays += days;
-    }
 
-    // 🔑 Vianor: kayıt olmayan günleri de devamsızlık say (oransal maaş)
-    // missingDays = beklenen - (puantajı girilmiş günler) - (izin günleri)
-    const recordedAttendanceDays = empAtt.length;
-    const missingDays = Math.max(
-      0,
-      expectedDaysInRange -
-        recordedAttendanceDays -
-        paidLeaveDays -
-        unpaidLeaveDays
-    );
-    // Toplam devamsızlık = explicit "gelmedi" + "kayıt yok" günler
-    const totalAbsentDays = explicitAbsentDays + missingDays;
+    let absentDeductionDays = 0;
+    let unpaidLeaveBusinessDays = 0;
+    let holidayWorkPremium = 0;
+
+    for (const dStr of eachDateInclusive(empStart, empEnd)) {
+      if (isPaidWithoutAttendanceDay(dStr)) {
+        const row = attendanceByDate.get(dStr);
+        if (qualifiesForHolidayWorkPremium(dStr, row?.status)) {
+          holidayWorkPremium += dailyRate;
+        }
+        continue;
+      }
+
+      const leaveKind = leaveOverlapKind(empLeaves, dStr);
+      if (leaveKind === "unpaid") {
+        unpaidLeaveBusinessDays += 1;
+        continue;
+      }
+      if (leaveKind === "paid") {
+        continue;
+      }
+
+      const att = attendanceByDate.get(dStr);
+      if (!att || att.status === "absent") {
+        absentDeductionDays += 1;
+        continue;
+      }
+      /** present dışında (leave/sick/holiday/off vb.) iş günü kaydı — kesinti yok */
+    }
 
     const overtimeAmount = overtimeHours * Number(e.hourly_overtime_rate || 0);
     const lateDeductions = lateMinutesTotal * minuteRate;
-    const absentDeductions = totalAbsentDays * dailyRate;
-    const unpaidLeaveDeductions = unpaidLeaveDays * dailyRate;
+    const absentDeductions = absentDeductionDays * dailyRate;
+    const unpaidLeaveDeductions = unpaidLeaveBusinessDays * dailyRate;
 
     const empAdvances = advances.filter(
       (a) =>
@@ -116,10 +120,7 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
         (a.deducted_in_month === month ||
           (!a.is_deducted && a.advance_date <= monthEnd))
     );
-    const advanceDeductions = empAdvances.reduce(
-      (s, a) => s + Number(a.amount || 0),
-      0
-    );
+    const advanceDeductions = empAdvances.reduce((s, a) => s + Number(a.amount || 0), 0);
 
     const tipsAmount = tips
       .filter(
@@ -132,7 +133,7 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       .reduce((s, t) => s + Number(t.amount || 0), 0);
 
     const baseSalary = Number(e.monthly_salary || 0);
-    const bonus = 0;
+    const bonus = round2(holidayWorkPremium);
     const netSalary = Math.max(
       0,
       baseSalary +
@@ -168,15 +169,9 @@ export function computePayrollForMonth(input: PayrollInput): PayrollComputed[] {
       daily_rate: round2(dailyRate),
       hourly_rate: round2(hourlyRate),
       late_minutes_total: lateMinutesTotal,
-      unpaid_leave_days: unpaidLeaveDays,
+      unpaid_leave_days: unpaidLeaveBusinessDays,
     };
   });
-}
-
-function diffDays(start: string, end: string): number {
-  const a = new Date(start + "T00:00:00").getTime();
-  const b = new Date(end + "T00:00:00").getTime();
-  return Math.round((b - a) / 86400000);
 }
 
 function round2(n: number) {

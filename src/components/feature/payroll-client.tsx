@@ -270,10 +270,13 @@ export function PayrollClient({
           </div>
 
           <p className="mt-3 text-xs text-ink-600">
-            Maaş, puantaja göre <strong>oransal</strong> hesaplanır: tam aylık maaş
-            ÷ <strong>{settings.monthly_work_days}</strong> = günlük ücret. Puantajda
-            "gelmedi" işaretli veya hiç <strong>kayıt girilmemiş</strong> günler devamsızlık
-            olarak düşülür · ücretsiz izinler ayrıca kesilir.
+            Günlük kazanım <strong>maktu maaş ÷ {settings.monthly_work_days}</strong>. Kesinti yalnızca{" "}
+            <strong>iş günlerinde</strong> yapılır: <strong>Pazar</strong> ile{" "}
+            <strong>resmi tatiller</strong> maaşa dahil kabul edilir, gelinmedi diye düşmez. İş gününde puantaj
+            yok veya &quot;gelmedi&quot; ise ücret kesilir. Ücretli izin kayıtlı günlerde kesinti olmaz; ücretsiz
+            iş günü izni ayrıca kesilir. Resmi tatilde puantaja <strong>&quot;geldi&quot;</strong> ise yasal 2 kat
+            kapsamında <strong>+1 günlük ücret</strong> kadar Prim (tabloda) eklenir. Resmi tarihler Diyanet ile
+            yılda bir güncellenir.
           </p>
 
           {rows.length > 0 && (
@@ -326,7 +329,7 @@ export function PayrollClient({
                   <th className="text-right px-2 py-3">Brüt</th>
                   <th className="text-right px-2 py-3">Mesai</th>
                   <th className="text-right px-2 py-3">Bahşiş</th>
-                  <th className="text-right px-2 py-3">Prim</th>
+                  <th className="text-right px-2 py-3">Prim (Resmi tat.)</th>
                   <th className="text-right px-2 py-3">Devam(-)</th>
                   <th className="text-right px-2 py-3">Geç(-)</th>
                   <th className="text-right px-2 py-3">Avans(-)</th>
@@ -462,7 +465,7 @@ export function PayrollClient({
                 <Row label="Brüt Maaş" value={formatTRY(detail.base_salary)} />
                 <Row label="Mesai" value={`+ ${formatTRY(detail.overtime_amount)}`} positive />
                 <Row label="Bahşiş" value={`+ ${formatTRY(detail.tips_amount)}`} positive />
-                <Row label="Prim" value={`+ ${formatTRY(detail.bonus)}`} positive />
+                <Row label="Prim (Resmi tatil)" value={`+ ${formatTRY(detail.bonus)}`} positive />
                 <Row label="Devamsızlık" value={`- ${formatTRY(detail.absent_deductions)}`} negative />
                 <Row label="Geç Kalma" value={`- ${formatTRY(detail.late_deductions)}`} negative />
                 <Row label="Ücretsiz İzin" value={`- ${formatTRY(detail.unpaid_leave_deductions)}`} negative />
