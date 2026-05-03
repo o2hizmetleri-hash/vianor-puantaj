@@ -45,6 +45,7 @@ export default async function VardiyaPage({ searchParams }: Props) {
         description="Haftalık vardiya takvimi — personeli vardiyalara atayın"
       />
       <ShiftPlanClient
+        key={dates[0]}
         dates={dates}
         employees={(empRes.data as any[]) || []}
         shifts={(shiftsRes.data as any[]) || []}

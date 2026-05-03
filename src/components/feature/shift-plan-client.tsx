@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
@@ -53,29 +53,38 @@ interface Assignment {
   check_out: string;  // "HH:MM" — otomatik geliş + 9 saat
 }
 
+function buildAssignments(attendance: Attendance[], shifts: Shift[]): Assignment[] {
+  return attendance
+    .filter((a) => !!a.shift_id)
+    .map((a) => {
+      const shift = shifts.find((s) => s.id === a.shift_id);
+      const checkIn =
+        a.check_in?.slice(0, 5) || shift?.start_time.slice(0, 5) || "10:00";
+      // Vianor standardı: çıkış HER ZAMAN geliş + 9 saat (mola dahil dükkanda kalış)
+      const checkOut =
+        a.check_out?.slice(0, 5) || addHoursToTime(checkIn, DEFAULT_SHIFT_HOURS);
+      return {
+        employee_id: a.employee_id,
+        shift_id: a.shift_id!,
+        date: a.work_date,
+        check_in: checkIn,
+        check_out: checkOut,
+      };
+    });
+}
+
 export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
   const [assignments, setAssignments] = useState<Assignment[]>(() =>
-    attendance
-      .filter((a) => !!a.shift_id)
-      .map((a) => {
-        const shift = shifts.find((s) => s.id === a.shift_id);
-        const checkIn =
-          a.check_in?.slice(0, 5) || shift?.start_time.slice(0, 5) || "10:00";
-        const checkOut =
-          a.check_out?.slice(0, 5) ||
-          addHoursToTime(checkIn, shift?.expected_hours || DEFAULT_SHIFT_HOURS);
-        return {
-          employee_id: a.employee_id,
-          shift_id: a.shift_id!,
-          date: a.work_date,
-          check_in: checkIn,
-          check_out: checkOut,
-        };
-      })
+    buildAssignments(attendance, shifts)
   );
+
+  // 🔧 Hafta navigasyonu — yeni veri geldiğinde state'i resetle
+  useEffect(() => {
+    setAssignments(buildAssignments(attendance, shifts));
+  }, [attendance, shifts, dates[0]]);
 
   const [adding, setAdding] = useState<{ date: string; shift_id: string } | null>(
     null
@@ -110,6 +119,7 @@ export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props)
     const params = new URLSearchParams(sp.toString());
     params.set("week", next.toISOString().slice(0, 10));
     router.push(`/vardiya?${params.toString()}`);
+    router.refresh();
   };
 
   const removeAssignment = (a: Assignment) => {
@@ -138,9 +148,8 @@ export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props)
       toast.error("Personel ve geliş saati seçilmeli");
       return;
     }
-    const shift = shifts.find((s) => s.id === adding.shift_id);
-    const hoursToAdd = shift?.expected_hours || DEFAULT_SHIFT_HOURS;
-    const checkOut = addHoursToTime(pickedCheckIn, hoursToAdd);
+    // Vianor standardı: HER ZAMAN 9 saat (vardiya türünden bağımsız)
+    const checkOut = addHoursToTime(pickedCheckIn, DEFAULT_SHIFT_HOURS);
 
     setAssignments((prev) => [
       ...prev,
@@ -155,11 +164,9 @@ export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props)
     setPickedEmployee(null);
   };
 
-  // Bir atamayı düzenle (saat değiştir)
+  // Bir atamayı düzenle (saat değiştir) — çıkış her zaman geliş + 9
   const updateAssignmentTime = (a: Assignment, newCheckIn: string) => {
-    const shift = shifts.find((s) => s.id === a.shift_id);
-    const hoursToAdd = shift?.expected_hours || DEFAULT_SHIFT_HOURS;
-    const newCheckOut = addHoursToTime(newCheckIn, hoursToAdd);
+    const newCheckOut = addHoursToTime(newCheckIn, DEFAULT_SHIFT_HOURS);
     setAssignments((prev) =>
       prev.map((x) =>
         x.employee_id === a.employee_id &&
@@ -193,9 +200,8 @@ export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props)
         const shift = shifts.find((s) => s.id === a.shift_id);
         const checkIn =
           a.check_in?.slice(0, 5) || shift?.start_time.slice(0, 5) || "10:00";
-        const checkOut =
-          a.check_out?.slice(0, 5) ||
-          addHoursToTime(checkIn, shift?.expected_hours || DEFAULT_SHIFT_HOURS);
+        // Vianor: çıkış her zaman geliş + 9 saat
+        const checkOut = a.check_out?.slice(0, 5) || addHoursToTime(checkIn, DEFAULT_SHIFT_HOURS);
         return {
           employee_id: a.employee_id,
           shift_id: a.shift_id,
@@ -432,19 +438,13 @@ export function ShiftPlanClient({ dates, employees, shifts, attendance }: Props)
                     </p>
                     <p className="font-mono font-semibold text-cherry-800">
                       {pickedCheckIn
-                        ? addHoursToTime(
-                            pickedCheckIn,
-                            shifts.find((s) => s.id === adding.shift_id)
-                              ?.expected_hours || DEFAULT_SHIFT_HOURS
-                          )
+                        ? addHoursToTime(pickedCheckIn, DEFAULT_SHIFT_HOURS)
                         : "—"}
                     </p>
                   </div>
                 </div>
                 <p className="text-xs text-ink-600">
-                  {shifts.find((s) => s.id === adding.shift_id)?.expected_hours ||
-                    DEFAULT_SHIFT_HOURS}{" "}
-                  saat dükkanda kalış (mola dahil)
+                  {DEFAULT_SHIFT_HOURS} saat dükkanda kalış (7.5 sa çalışma + 1.5 sa mola)
                 </p>
               </div>
 
