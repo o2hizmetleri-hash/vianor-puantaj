@@ -20,6 +20,7 @@ import {
   ATTENDANCE_STATUS,
   formatTRY,
   formatTime,
+  istanbulPastDaysAscending,
   monthStr,
   todayStr,
 } from "@/lib/utils";
@@ -32,6 +33,7 @@ async function getDashboardData() {
   const supabase = createClient();
   const today = todayStr();
   const month = monthStr();
+  const weekDayKeys = istanbulPastDaysAscending(7);
 
   const [
     employeesRes,
@@ -54,7 +56,7 @@ async function getDashboardData() {
     supabase
       .from("attendance")
       .select("work_date, status")
-      .gte("work_date", startOfWeekStr(7))
+      .gte("work_date", weekDayKeys[0])
       .lte("work_date", today),
     supabase
       .from("advances")
@@ -72,26 +74,15 @@ async function getDashboardData() {
     todayAttendance: todayAttendanceRes.data || [],
     settings: settingsRes.data,
     weekAttendance: monthAttendanceRes.data || [],
+    weekDayKeys,
     pendingAdvances: advancesRes.data || [],
     monthTips: tipsRes.data || [],
   };
 }
 
-function startOfWeekStr(daysBack = 7) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysBack);
-  return d.toISOString().slice(0, 10);
-}
-
 export default async function DashboardPage() {
   const data = await getDashboardData();
-  const { employees, todayAttendance, settings, weekAttendance } = data;
-
-  const presentCount = todayAttendance.filter((a) => a.status === "present").length;
-  const absentCount = todayAttendance.filter((a) => a.status === "absent").length;
-  const leaveCount = todayAttendance.filter(
-    (a) => a.status === "leave" || a.status === "sick"
-  ).length;
+  const { employees, todayAttendance, settings, weekAttendance, weekDayKeys } = data;
 
   const totalMonthlyPayroll = employees.reduce(
     (sum, e: any) => sum + Number(e.monthly_salary || 0),
@@ -103,6 +94,18 @@ export default async function DashboardPage() {
     todayAttendance.map((a: any) => [a.employee_id, a])
   );
 
+  /** Liste ile aynı mantık: kayıt yoksa Gelmedi sayılır; üst kartlar sadece tablodaki satırlara bakmayacak */
+  let presentCount = 0;
+  let absentCount = 0;
+  let leaveCount = 0;
+  for (const e of employees as any[]) {
+    const att = attendanceMap.get(e.id) as any;
+    const st = att?.status ?? "absent";
+    if (st === "present") presentCount++;
+    else if (st === "leave" || st === "sick") leaveCount++;
+    else absentCount++;
+  }
+
   const departmentDist: Record<string, { name: string; value: number; color: string }> = {};
   for (const e of employees as any[]) {
     const name = e.department?.name || "Atanmamış";
@@ -113,10 +116,7 @@ export default async function DashboardPage() {
 
   // Son 7 gün doluluk
   const weekStats: Record<string, { date: string; present: number; absent: number; leave: number }> = {};
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+  for (const key of weekDayKeys) {
     weekStats[key] = { date: key, present: 0, absent: 0, leave: 0 };
   }
   for (const a of weekAttendance as any[]) {

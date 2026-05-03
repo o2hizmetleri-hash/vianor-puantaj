@@ -31,12 +31,40 @@ export function formatRelative(date: Date | string | null | undefined) {
   return formatDistanceToNow(d, { addSuffix: true, locale: tr });
 }
 
+const TZ_ISTANBUL = "Europe/Istanbul";
+
+/** İstanbul takvim günü `yyyy-MM-dd` (Vercel UTC ortamında bile doğru; puantaj tarihleriyle uyumlu) */
+export function calendarDayIstanbul(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_ISTANBUL,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 export function todayStr() {
-  return format(new Date(), "yyyy-MM-dd");
+  return calendarDayIstanbul(new Date());
+}
+
+/** Bugünden geriye `count` gün, eskiden yeniye sıralı tarihler (grafik / haftalık sorgu için) */
+export function istanbulPastDaysAscending(count: number): string[] {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_ISTANBUL,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const out: string[] = [];
+  const now = Date.now();
+  for (let i = count - 1; i >= 0; i--) {
+    out.push(fmt.format(new Date(now - i * 86400000)));
+  }
+  return out;
 }
 
 export function monthStr(date: Date = new Date()) {
-  return format(date, "yyyy-MM");
+  return calendarDayIstanbul(date).slice(0, 7);
 }
 
 export function monthLabel(month: string) {
